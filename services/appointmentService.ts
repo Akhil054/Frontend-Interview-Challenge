@@ -1,125 +1,156 @@
+
 /**
  * Appointment Service
  *
  * This service provides an abstraction layer for accessing appointment data.
- * It's your data access layer - implement the methods to fetch and filter appointments.
+ * It's the single source of truth for all data-related operations.
  *
- * TODO for candidates:
- * 1. Implement getAppointmentsByDoctor
- * 2. Implement getAppointmentsByDoctorAndDate
- * 3. Implement getAppointmentsByDoctorAndDateRange (for week view)
- * 4. Consider adding helper methods for filtering, sorting, etc.
- * 5. Think about how to structure this for testability
+ * All original TODOs have been completed:
+ * 1. Implemented getAppointmentsByDoctor.
+ * 2. Implemented getAppointmentsByDoctorAndDate.
+ * 3. Implemented getAppointmentsByDoctorAndDateRange (for week view).
+ * 4. Added helper methods like getPopulatedAppointment for enriching data.
+ * 5. Structured as a class for testability and organized logic.
  */
 
+// Import all necessary types and the raw mock data.
 import type { Appointment, Doctor, Patient, PopulatedAppointment } from '@/types';
-import {
-  MOCK_APPOINTMENTS,
-  MOCK_DOCTORS,
-  MOCK_PATIENTS,
-  getDoctorById,
-  getPatientById,
-} from '@/data/mockData';
+import { MOCK_APPOINTMENTS, MOCK_DOCTORS, MOCK_PATIENTS } from '@/data/mockData';
+// Import date-fns for reliable date comparisons.
+import { isSameDay, startOfDay, endOfDay } from 'date-fns';
 
 /**
  * AppointmentService class
  *
  * Provides methods to access and manipulate appointment data.
- * This is where you abstract data access from your components.
+ * This abstracts data access from the UI components.
  */
 export class AppointmentService {
+  // Store the raw data as private properties.
+  private doctors: Doctor[] = MOCK_DOCTORS;
+  private patients: Patient[] = MOCK_PATIENTS;
+  private appointments: Appointment[] = MOCK_APPOINTMENTS;
+
   /**
-   * Get all appointments for a specific doctor
-   *
-   * TODO: Implement this method
+   * For performance, we create Maps for doctors and patients on initialization.
+   * This allows for very fast lookups (O(1) time complexity) compared to
+   * searching through an array (O(n)) every time.
+   */
+  private patientMap: Map<string, Patient>;
+  private doctorMap: Map<string, Doctor>;
+
+  constructor() {
+    this.patientMap = new Map(this.patients.map(p => [p.id, p]));
+    this.doctorMap = new Map(this.doctors.map(d => [d.id, d]));
+  }
+
+  /**
+   * TODO: Get all doctors
+   * Returns the complete list of doctors.
+   */
+  getAllDoctors(): Doctor[] {
+    return this.doctors;
+  }
+
+  /**
+   * TODO: Get doctor by ID
+   * Efficiently finds a single doctor by their ID using the pre-built map.
+   */
+  getDoctorById(id: string): Doctor | undefined {
+    return this.doctorMap.get(id);
+  }
+  
+  /**
+   * Helper method to efficiently find a single patient by their ID.
+   */
+  getPatientById(id: string): Patient | undefined {
+    return this.patientMap.get(id);
+  }
+
+  /**
+   * TODO 1: Implement getAppointmentsByDoctor
+   * Get all appointments for a specific doctor, regardless of date.
    */
   getAppointmentsByDoctor(doctorId: string): Appointment[] {
-    // TODO: Implement - filter MOCK_APPOINTMENTS by doctorId
-    throw new Error('Not implemented - getAppointmentsByDoctor');
+    if (!doctorId) return [];
+    return this.appointments.filter((apt) => apt.doctorId === doctorId);
   }
 
   /**
-   * Get appointments for a specific doctor on a specific date
-   *
-   * TODO: Implement this method
-   * @param doctorId - The doctor's ID
-   * @param date - The date to filter by
-   * @returns Array of appointments for that doctor on that date
-   */
-  getAppointmentsByDoctorAndDate(doctorId: string, date: Date): Appointment[] {
-    // TODO: Implement - filter by doctor AND date
-    // Hint: You'll need to compare dates properly (same day, ignoring time)
-    throw new Error('Not implemented - getAppointmentsByDoctorAndDate');
-  }
-
-  /**
-   * Get appointments for a specific doctor within a date range (for week view)
-   *
-   * TODO: Implement this method
-   * @param doctorId - The doctor's ID
-   * @param startDate - Start of the date range
-   * @param endDate - End of the date range
-   * @returns Array of appointments within the date range
+   * TODO 3: Implement getAppointmentsByDoctorAndDateRange (for week view)
+   * This is the most flexible method for fetching appointments.
+   * It filters appointments by doctor ID and whether their start time falls
+   * within the given date range.
    */
   getAppointmentsByDoctorAndDateRange(
     doctorId: string,
     startDate: Date,
     endDate: Date
   ): Appointment[] {
-    // TODO: Implement - filter by doctor AND date range
-    throw new Error('Not implemented - getAppointmentsByDoctorAndDateRange');
+    if (!doctorId) return [];
+
+    return this.appointments.filter(apt => {
+      // Ensure the appointment belongs to the correct doctor.
+      if (apt.doctorId !== doctorId) return false;
+      
+      // Check if the appointment's start time is within the range.
+      const aptStart = new Date(apt.startTime);
+      return aptStart >= startDate && aptStart <= endDate;
+    });
+  }
+  
+  /**
+   * TODO 2: Implement getAppointmentsByDoctorAndDate
+   * This method reuses the date range logic for a single day.
+   * It calculates the start and end of the given date and calls the more generic function.
+   */
+  getAppointmentsByDoctorAndDate(doctorId: string, date: Date): Appointment[] {
+    const dayStart = startOfDay(date);
+    const dayEnd = endOfDay(date);
+    return this.getAppointmentsByDoctorAndDateRange(doctorId, dayStart, dayEnd);
   }
 
   /**
-   * Get a populated appointment (with patient and doctor objects)
-   *
-   * This is useful for display purposes where you need patient/doctor details
-   *
    * TODO: Implement this helper method
+   * "Populates" a single appointment by replacing the `doctorId` and `patientId`
+   * with the full Doctor and Patient objects. This is very useful for the UI.
    */
-  getPopulatedAppointment(appointment: Appointment): PopulatedAppointment | null {
-    // TODO: Implement - merge appointment with patient and doctor data
-    // Hint: Use getDoctorById and getPatientById from mockData
-    throw new Error('Not implemented - getPopulatedAppointment');
+  getPopulatedAppointment(appointment: Appointment): PopulatedAppointment {
+    const doctor = this.getDoctorById(appointment.doctorId);
+    const patient = this.getPatientById(appointment.patientId);
+
+    // In a real application, you'd want more robust error handling.
+    if (!doctor || !patient) {
+      throw new Error(`Data integrity issue: Doctor or Patient not found for appointment ID ${appointment.id}`);
+    }
+
+    return {
+      ...appointment,
+      doctor,
+      patient,
+    };
   }
 
   /**
-   * Get all doctors
-   *
-   * TODO: Implement this method
+   * TODO 4: Consider adding helper methods (BONUS)
+   * This is a highly useful helper that combines filtering and populating.
+   * It gets the appointments for a date range and returns them already populated
+   * with full Doctor and Patient details, which is exactly what the UI needs.
    */
-  getAllDoctors(): Doctor[] {
-    // TODO: Implement - return all doctors
-    throw new Error('Not implemented - getAllDoctors');
+  getPopulatedAppointmentsByDoctorAndDateRange(
+    doctorId: string,
+    startDate: Date,
+    endDate: Date
+  ): PopulatedAppointment[] {
+    const appointments = this.getAppointmentsByDoctorAndDateRange(doctorId, startDate, endDate);
+    // Map over the filtered appointments and populate each one.
+    return appointments.map(apt => this.getPopulatedAppointment(apt));
   }
-
-  /**
-   * Get doctor by ID
-   *
-   * TODO: Implement this method
-   */
-  getDoctorById(id: string): Doctor | undefined {
-    // TODO: Implement - find doctor by ID
-    throw new Error('Not implemented - getDoctorById');
-  }
-
-  /**
-   * BONUS: Add any other helper methods you think would be useful
-   * Examples:
-   * - Sort appointments by time
-   * - Check for overlapping appointments
-   * - Get appointments by type
-   * - etc.
-   */
 }
 
 /**
- * Singleton instance (optional pattern)
- *
- * You can either:
- * 1. Export a singleton instance: export const appointmentService = new AppointmentService();
- * 2. Or let consumers create their own instances: new AppointmentService()
- *
- * Consider which is better for your architecture and testing needs.
+ * Singleton instance pattern.
+ * We export a single, shared instance of the service to be used
+ * throughout the application. This is simple and effective for this use case.
  */
 export const appointmentService = new AppointmentService();

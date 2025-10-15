@@ -1,28 +1,15 @@
-/**
- * ScheduleView Component
- *
- * Main component that orchestrates the schedule display.
- * This component should compose smaller components together.
- *
- * TODO for candidates:
- * 1. Create the component structure (header, controls, calendar)
- * 2. Compose DoctorSelector, DayView, WeekView together
- * 3. Handle view switching (day vs week)
- * 4. Manage state or use the useAppointments hook
- * 5. Think about component composition and reusability
- */
-
 'use client';
 
-import { useState } from 'react';
-import type { CalendarView } from '@/types';
-
-// TODO: Import your components
-// import { DoctorSelector } from './DoctorSelector';
-// import { DayView } from './DayView';
-// import { WeekView } from './WeekView';
+import type { CalendarView, Doctor } from '@/types';
+import { useMemo } from 'react';
+import { startOfWeek, endOfWeek, startOfDay, endOfDay, format } from 'date-fns';
+import { useAppointments } from '@/hooks/useAppointments';
+import { DoctorSelector } from './DoctorSelector';
+import { DayView } from './DayView';
+import { WeekView } from './WeekView';
 
 interface ScheduleViewProps {
+  doctors: Doctor[];
   selectedDoctorId: string;
   selectedDate: Date;
   view: CalendarView;
@@ -31,20 +18,8 @@ interface ScheduleViewProps {
   onViewChange: (view: CalendarView) => void;
 }
 
-/**
- * ScheduleView Component
- *
- * This is the main container component for the schedule interface.
- *
- * TODO: Implement this component
- *
- * Consider:
- * - How to structure the layout (header, controls, calendar)
- * - How to compose smaller components
- * - How to pass data down to child components
- * - How to handle user interactions (view switching, date changes)
- */
 export function ScheduleView({
+  doctors,
   selectedDoctorId,
   selectedDate,
   view,
@@ -52,77 +27,78 @@ export function ScheduleView({
   onDateChange,
   onViewChange,
 }: ScheduleViewProps) {
-  // TODO: Use the useAppointments hook to fetch data
-  // const { appointments, doctor, loading, error } = useAppointments({
-  //   doctorId: selectedDoctorId,
-  //   date: selectedDate,
-  // });
+  
+  const { startDate, endDate } = useMemo(() => {
+    if (view === 'week') {
+      return { startDate: startOfWeek(selectedDate, { weekStartsOn: 1 }), endDate: endOfWeek(selectedDate, { weekStartsOn: 1 }) };
+    }
+    return { startDate: startOfDay(selectedDate), endDate: endOfDay(selectedDate) };
+  }, [selectedDate, view]);
+
+  const { appointments, doctor, loading, error } = useAppointments({
+    doctorId: selectedDoctorId,
+    startDate,
+    endDate,
+  });
 
   return (
-    <div className="bg-white rounded-lg shadow-lg">
-      {/* TODO: Implement the component structure */}
-
-      {/* Header with doctor info and controls */}
-      <div className="border-b border-gray-200 p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Doctor Schedule</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              TODO: Display doctor name and specialty
-            </p>
-          </div>
-
-          <div className="flex gap-4">
-            {/* TODO: Add DoctorSelector component */}
-            <div className="text-sm text-gray-500">Doctor Selector</div>
-
-            {/* TODO: Add date picker */}
-            <div className="text-sm text-gray-500">Date Picker</div>
-
-            {/* TODO: Add view toggle buttons (Day/Week) */}
-            <div className="flex gap-2">
-              <button
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded"
-                onClick={() => onViewChange('day')}
-              >
-                Day
-              </button>
-              <button
-                className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded"
-                onClick={() => onViewChange('week')}
-              >
-                Week
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Calendar View */}
-      <div className="p-6">
-        {/* TODO: Conditionally render DayView or WeekView based on view prop */}
-        <div className="text-center text-gray-500 py-12">
-          <p>Calendar View Goes Here</p>
-          <p className="text-sm mt-2">
-            Implement DayView and WeekView components and render based on selected view
+    <div className="bg-white rounded-lg shadow p-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">
+            {doctor ? `Dr. ${doctor.name} - ${doctor.specialty}` : 'Select a Doctor'}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {view === 'day' 
+              ? format(selectedDate, 'MMMM d, yyyy')
+              : `Week of ${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`
+            }
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <DoctorSelector doctors={doctors} selectedDoctorId={selectedDoctorId} onDoctorChange={onDoctorChange} />
+          <input
+            type="date"
+            value={format(selectedDate, 'yyyy-MM-dd')}
+            onChange={(e) => onDateChange(new Date(e.target.value))}
+            className="border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => onViewChange('day')}
+              className={`text-sm font-semibold py-1 px-3 rounded-md transition-colors ${view === 'day' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}
+            >
+              Day
+            </button>
+            <button
+              onClick={() => onViewChange('week')}
+              className={`text-sm font-semibold py-1 px-3 rounded-md transition-colors ${view === 'week' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}
+            >
+              Week
+            </button>
+          </div>
+        </div>
+      </header>
 
-        {/* TODO: Uncomment when components are ready */}
-        {/* {view === 'day' ? (
-          <DayView
-            appointments={appointments}
-            doctor={doctor}
-            date={selectedDate}
-          />
-        ) : (
-          <WeekView
-            appointments={appointments}
-            doctor={doctor}
-            weekStartDate={getWeekStart(selectedDate)}
-          />
-        )} */}
-      </div>
+      <main>
+        {loading && <div className="text-center p-12 font-semibold text-gray-500">Loading schedule...</div>}
+        {error && <div className="text-center p-12 text-red-500">Error: {error.message}</div>}
+        
+        {!loading && !error && selectedDoctorId && (
+          view === 'day' ? (
+            <DayView appointments={appointments} />
+          ) : (
+            <WeekView appointments={appointments} weekDate={startDate} />
+          )
+        )}
+        
+        {!selectedDoctorId && !loading && (
+             <div className="text-center p-16 bg-gray-50 rounded-lg">
+                 <h3 className="text-lg font-semibold text-gray-700">Please Select a Doctor</h3>
+                 <p className="text-gray-500 mt-2">Choose a doctor to view their schedule.</p>
+             </div>
+        )}
+      </main>
     </div>
   );
 }

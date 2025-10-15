@@ -2,85 +2,76 @@
  * useAppointments Hook
  *
  * This is a custom hook that encapsulates the business logic for fetching
- * and managing appointments. This is the "headless" pattern - separating
- * logic from presentation.
- *
- * TODO for candidates:
- * 1. Implement the hook to fetch appointments based on filters
- * 2. Add loading and error states
- * 3. Consider memoization for performance
- * 4. Think about how to make this reusable for both day and week views
+ * and managing appointments. It separates the "how to get data" from the
+ * "how to display data".
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Appointment, Doctor } from '@/types';
+import type { Doctor, PopulatedAppointment } from '@/types';
 import { appointmentService } from '@/services/appointmentService';
 
-/**
- * Hook parameters
- */
+// The hook only needs these parameters for filtering.
 interface UseAppointmentsParams {
   doctorId: string;
-  date: Date;
-  // For week view, you might want to pass a date range instead
-  startDate?: Date;
-  endDate?: Date;
+  startDate: Date;
+  endDate: Date;
 }
 
-/**
- * Hook return value
- */
+// This defines the data structure the hook will return to the component.
 interface UseAppointmentsReturn {
-  appointments: Appointment[];
+  appointments: PopulatedAppointment[];
   doctor: Doctor | undefined;
   loading: boolean;
   error: Error | null;
-  // Add any other useful data or functions
 }
 
-/**
- * useAppointments Hook
- *
- * Fetches and manages appointment data for a given doctor and date/date range.
- *
- * TODO: Implement this hook
- *
- * Tips:
- * - Use useState for loading and error states
- * - Use useEffect to fetch data when params change
- * - Use useMemo to memoize expensive computations
- * - Consider how to handle both single date (day view) and date range (week view)
- */
 export function useAppointments(params: UseAppointmentsParams): UseAppointmentsReturn {
-  const { doctorId, date, startDate, endDate } = params;
+  const { doctorId, startDate, endDate } = params;
 
-  // TODO: Add state for appointments, loading, error
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Internal state for the hook to manage.
+  const [appointments, setAppointments] = useState<PopulatedAppointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // TODO: Fetch doctor data
+  // Memoize the doctor lookup for efficiency. This only re-runs if doctorId changes.
   const doctor = useMemo(() => {
-    // Implement: Get doctor by ID
-    // return appointmentService.getDoctorById(doctorId);
-    return undefined;
+    if (!doctorId) return undefined;
+    return appointmentService.getDoctorById(doctorId);
   }, [doctorId]);
 
-  // TODO: Fetch appointments when dependencies change
+  // The core effect that fetches data whenever the filters change.
   useEffect(() => {
-    // Implement: Fetch appointments
-    // Consider:
-    // - If startDate and endDate are provided, use date range
-    // - Otherwise, use single date
-    // - Set loading state
-    // - Handle errors
-    // - Set appointments
+    // If no doctor is selected, clear data and stop loading.
+    if (!doctorId) {
+      setAppointments([]);
+      setLoading(false);
+      return;
+    }
 
-    console.log('TODO: Fetch appointments for', { doctorId, date, startDate, endDate });
+    // This function contains the data fetching logic.
+    const fetchData = () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Call the service layer to get the fully populated data.
+        // This is the key: we get the data ready for the UI right here.
+        const fetchedAppointments = appointmentService.getPopulatedAppointmentsByDoctorAndDateRange(
+          doctorId,
+          startDate,
+          endDate
+        );
 
-    // Placeholder - remove when implementing
-    setLoading(false);
-  }, [doctorId, date, startDate, endDate]);
+        setAppointments(fetchedAppointments);
+      } catch (err) {
+        setError(err as Error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [doctorId, startDate, endDate]); // Re-run this effect if any of these dependencies change.
 
   return {
     appointments,
@@ -89,12 +80,3 @@ export function useAppointments(params: UseAppointmentsParams): UseAppointmentsR
     error,
   };
 }
-
-/**
- * BONUS: Create additional hooks for specific use cases
- *
- * Examples:
- * - useDayViewAppointments(doctorId: string, date: Date)
- * - useWeekViewAppointments(doctorId: string, weekStartDate: Date)
- * - useDoctors() - hook to get all doctors
- */
